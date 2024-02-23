@@ -99,7 +99,9 @@ def run(
 
         # NMS
         with dt[2]:
+            pred = pred[0][1] if isinstance(pred[0], list) else pred[0]
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            
 
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
