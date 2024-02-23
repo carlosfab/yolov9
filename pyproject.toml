@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "yolov9"
+version = "0.1.0"
+description = ""
+authors = ["Carlos Melo <carlos.fab@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+gitpython = "^3.1.42"
+ipython = "^8.22.1"
+matplotlib = ">=3.2.2"
+numpy = ">=1.18.5"
+opencv-python = ">=4.1.1"
+pillow = ">=7.1.2"
+psutil = "^5.9.8"
+pyyaml = ">=5.3.1"
+requests = ">=2.23.0"
+scipy = ">=1.4.1"
+thop = ">=0.1.1"
+torch = ">=1.7.0"
+torchvision = ">=0.8.1"
+tqdm = ">=4.64.0"
+tensorboard = ">=2.4.1"
+pandas = ">=1.1.4"
+seaborn = ">=0.11.0"
+albumentations = ">=1.0.3"
+pycocotools = ">=2.0"
+jupyterlab = "^4.1.2"
+tdqm = "^0.0.1"
+ipywidgets = "^8.1.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
