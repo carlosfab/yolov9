@@ -500,6 +500,9 @@ class BaseModel(nn.Module):
     def fuse(self):  # fuse model Conv2d() + BatchNorm2d() layers
         LOGGER.info('Fusing layers... ')
         for m in self.model.modules():
+            if isinstance(m, (RepConvN)) and hasattr(m, 'fuse_convs'):
+                m.fuse_convs()
+                m.forward = m.forward_fuse  # update forward
             if isinstance(m, (Conv, DWConv)) and hasattr(m, 'bn'):
                 m.conv = fuse_conv_and_bn(m.conv, m.bn)  # update conv
                 delattr(m, 'bn')  # remove batchnorm
@@ -514,7 +517,7 @@ class BaseModel(nn.Module):
         # Apply to(), cpu(), cuda(), half() to model tensors that are not parameters or registered buffers
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, DualDetect, TripleDetect, DDetect, DualDDetect, TripleDDetect, Segment)):
+        if isinstance(m, (Detect, DualDetect, TripleDetect, DDetect, DualDDetect, TripleDDetect, Segment, Panoptic)):
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
             m.strides = fn(m.strides)
@@ -548,10 +551,10 @@ class DetectionModel(BaseModel):
 
         # Build strides, anchors
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, DDetect, Segment)):
+        if isinstance(m, (Detect, DDetect, Segment, Panoptic)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment)) else self.forward(x)
+            forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Panoptic)) else self.forward(x)
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             # check_anchor_order(m)
             # m.anchors /= m.stride.view(-1, 1, 1)
@@ -560,7 +563,7 @@ class DetectionModel(BaseModel):
         if isinstance(m, (DualDetect, TripleDetect, DualDDetect, TripleDDetect)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            #forward = lambda x: self.forward(x)[0][0] if isinstance(m, (DualSegment)) else self.forward(x)[0]
+            #forward = lambda x: self.forward(x)[0][0] if isinstance(m, (DualSegment, DualPanoptic)) else self.forward(x)[0]
             forward = lambda x: self.forward(x)[0]
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             # check_anchor_order(m)
@@ -662,6 +665,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
     anchors, nc, gd, gw, act = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple'], d.get('activation')
     if act:
         Conv.default_act = eval(act)  # redefine default activation, i.e. Conv.default_act = nn.SiLU()
+        RepConvN.default_act = eval(act)  # redefine default activation, i.e. Conv.default_act = nn.SiLU()
         LOGGER.info(f"{colorstr('activation:')} {act}")  # print
     na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors  # number of anchors
     no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
@@ -701,11 +705,11 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         elif m is CBFuse:
             c2 = ch[f[-1]]
         # TODO: channel, gw, gd
-        elif m in {Detect, DualDetect, TripleDetect, DDetect, DualDDetect, TripleDDetect, Segment}:
+        elif m in {Detect, DualDetect, TripleDetect, DDetect, DualDDetect, TripleDDetect, Segment, Panoptic}:
             args.append([ch[x] for x in f])
             # if isinstance(args[1], int):  # number of anchors
             #     args[1] = [list(range(args[1] * 2))] * len(f)
-            if m in {Segment}:
+            if m in {Segment, Panoptic}:
                 args[2] = make_divisible(args[2] * gw, 8)
         elif m is Contract:
             c2 = ch[f] * args[0] ** 2
